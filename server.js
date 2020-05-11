@@ -79,10 +79,7 @@ app.post('/api/shorturl/new', (req, res) => {
       if (err) {
         res.json({ error: 'invalid URL' });
       } else {
-        const domain = hostname.split('.')[0];
-        const shortUrlPrefix = domain.replace(/(^\w+)(\w{2}$)/, '$1.$2');
-        const shortUrlSuffix = randomStrGenerator(4);
-        const shortUrl = shortUrlPrefix + '-' + shortUrlSuffix;
+        const shortUrl = randomStrGenerator(6);
         // Checks if url exists in database
         UrlModel.findOne({ originalUrl: url }, (queryError, queryResult) => {
           if (queryError) return console.error(queryError);
@@ -97,7 +94,6 @@ app.post('/api/shorturl/new', (req, res) => {
               shortUrl: shortUrl,
             });
             urlRecord.save((saveError, savedResult) => {
-              console.log(savedResult);
               if (saveError) return console.error(saveError);
               res.json({
                 original_url: savedResult.originalUrl,
@@ -115,7 +111,6 @@ app.post('/api/shorturl/new', (req, res) => {
 
 // Get saved original url
 app.get('/api/shorturl/:short_url', (req, res) => {
-  console.log(req.params.short_url);
   UrlModel.findOne({ shortUrl: req.params.short_url }, (err, result) => {
     if (err) return console.error(err);
     res.redirect(result.originalUrl);
