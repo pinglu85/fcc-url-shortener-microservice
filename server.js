@@ -44,14 +44,14 @@ const urlSchema = new Schema(
   {
     originalUrl: String,
     shortUrl: String,
+  },
+  {
+    writeConcern: {
+      w: 'majority',
+      j: true,
+      wtimeout: 1000,
+    },
   }
-  // {
-  //   writeConcern: {
-  //     w: 'majority',
-  //     j: true,
-  //     wtimeout: 1000,
-  //   },
-  // }
 );
 
 // url model
