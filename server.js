@@ -14,8 +14,6 @@ const randomStrGenerator = require('./utils/generateRandomStr');
 const app = express();
 
 // Basic Configuration
-const port = process.env.PORT || 3000;
-
 /** this project needs a db !! **/
 // mongoose.connect(process.env.DB_URI);
 mongoose
@@ -23,7 +21,9 @@ mongoose
     useNewUrlParser: true,
     useUnifiedTopology: true,
   })
-  .catch((error) => console.log(error));
+  .catch((error) => {
+    throw new Error(error);
+  });
 
 app.use(cors());
 
@@ -44,14 +44,14 @@ const urlSchema = new Schema(
   {
     originalUrl: String,
     shortUrl: String,
-  },
-  {
-    writeConcern: {
-      w: 'majority',
-      j: true,
-      wtimeout: 1000,
-    },
   }
+  // {
+  //   writeConcern: {
+  //     w: 'majority',
+  //     j: true,
+  //     wtimeout: 1000,
+  //   },
+  // }
 );
 
 // url model
@@ -62,7 +62,7 @@ const urlRegex = /^https?:\/\/([a-z\d]+-*[a-z\d]+\.[a-z\d]+-*[a-z\d]+|[a-z\d]+-*
 
 // URL shortener API endpoint
 // Post new url
-app.post('/api/shorturl/new', (req, res) => {
+app.post('/api/shorturl/new', (req, res, next) => {
   const url = req.body.url;
   let hostname = '';
 
@@ -77,12 +77,13 @@ app.post('/api/shorturl/new', (req, res) => {
     // Checks if url points to a valid site
     dns.lookup(hostname, (err) => {
       if (err) {
-        res.json({ error: 'invalid URL' });
+        res.json({ error: 'Host does not exist' });
       } else {
         const shortUrl = randomStrGenerator(6);
+
         // Checks if url exists in database
         UrlModel.findOne({ originalUrl: url }, (queryError, queryResult) => {
-          if (queryError) return console.error(queryError);
+          if (queryError) return next(queryError);
           if (queryResult) {
             res.json({
               original_url: queryResult.originalUrl,
@@ -94,7 +95,7 @@ app.post('/api/shorturl/new', (req, res) => {
               shortUrl: shortUrl,
             });
             urlRecord.save((saveError, savedResult) => {
-              if (saveError) return console.error(saveError);
+              if (saveError) return next(saveError);
               res.json({
                 original_url: savedResult.originalUrl,
                 short_url: savedResult.shortUrl,
@@ -105,18 +106,42 @@ app.post('/api/shorturl/new', (req, res) => {
       }
     });
   } else {
-    res.json({ error: 'invalid URL' });
+    res.json({ error: 'invalid url' });
   }
 });
 
 // Get saved original url
-app.get('/api/shorturl/:short_url', (req, res) => {
+app.get('/api/shorturl/:short_url', (req, res, next) => {
   UrlModel.findOne({ shortUrl: req.params.short_url }, (err, result) => {
-    if (err) return console.error(err);
+    if (err) return next(err);
+    if (!result) return next();
     res.redirect(result.originalUrl);
   });
 });
 
-app.listen(port, function () {
-  console.log('Node.js listening on ' + port);
+// Not found middleware
+app.use((req, res, next) => {
+  return next({ status: 404, message: 'not found' });
+});
+
+// Error handling middleware
+app.use((err, req, res, next) => {
+  let errCode;
+  let errMessage;
+  if (err.errors) {
+    // mongoose validation error
+    errCode = 400; // bad request
+    const keys = Object.keys(err.errors);
+    // report the first validation error
+    errMessage = err.errors[keys[0]].message;
+  } else {
+    // generic or custom error
+    errCode = err.status || 500;
+    errMessage = err.message || 'Internal Server Error';
+  }
+  res.status(errCode).type('txt').send(errMessage);
+});
+
+const listener = app.listen(process.env.PORT || 3000, function () {
+  console.log('Node.js listening on ' + listener.address().port);
 });
