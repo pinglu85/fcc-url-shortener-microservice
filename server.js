@@ -8,6 +8,7 @@ const bodyParser = require('body-parser');
 require('dotenv').config();
 
 const cors = require('cors');
+const psl = require('psl');
 
 const randomStrGenerator = require('./utils/generateRandomStr');
 
@@ -64,18 +65,15 @@ const urlRegex = /^https?:\/\/([a-z\d]+-*[a-z\d]+\.[a-z\d]+-*[a-z\d]+|[a-z\d]+-*
 // Post new url
 app.post('/api/shorturl/new', (req, res, next) => {
   const url = req.body.url;
-  let hostname = '';
 
   // Checks if url is valid
   if (urlRegex.test(url)) {
-    // Extracts hostname from url
-    hostname = url
-      .replace(/^https?:\/\//, '')
-      .replace(/\/.*/, '')
-      .replace(/(^[a-z\d-_]{1,}\.)([a-z\d-_]{1,}\.[a-z\d]{2,}$)/, '$2');
+    // Parse domain from url
+    const domain = url.replace(/^https?:\/\//, '').replace(/\/.*/, '');
+    const parsedDomain = psl.parse(domain);
 
     // Checks if url points to a valid site
-    dns.lookup(hostname, (err) => {
+    dns.lookup(parsedDomain.domain, (err) => {
       if (err) {
         res.json({ error: 'Host does not exist' });
       } else {
